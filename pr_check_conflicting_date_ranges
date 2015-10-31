@@ -1,0 +1,63 @@
+PROCEDURE PR_VALIDATE_TAX_VARIATION(  P_DATA             in out ref cursor,
+                                  P_DT_START_TERM    in TAX_VARIATION.DT_START_TERM%TYPE,
+                                  P_DT_END_TERM      in TAX_VARIATION.DT_END_TERM%TYPE,
+                                  P_ID_TAX_VARIATION in TAX_VARIATION.ID_TAX_VARIATION%TYPE,
+                                  P_ID_TAX           in TAX_VARIATION.ID_TAX%TYPE,
+                                  P_ID_BRANCH_GROUP  in TAX_VARIATION.ID_BRANCH_GROUP%TYPE,
+                                  P_ID_BRANCH        in TAX_VARIATION.ID_BRANCH%TYPE,
+                                  P_ID_SERVICE       in TAX_VARIATION.ID_SERVICE%TYPE) IS
+BEGIN
+  OPEN P_DATA FOR
+      select 1 from dual where NOT EXISTS 
+      (
+      
+      SELECT *
+      FROM TAX_VARIATION tax_var
+      WHERE 1=1
+      AND ID_TAX=P_ID_TAX
+      
+      --P_ID_TAX_VARIATION IS NOT NULL-> CHECK P_ID_TAX_VARIATION<>ID_TAX_VARIATION
+      AND (P_ID_TAX_VARIATION IS NULL OR ID_TAX_VARIATION <> P_ID_TAX_VARIATION)
+ 
+      --P_ID_SERVICE IS NOT NULL -> CHECK EXISTS TAX VARIATION ID_SERVICE
+      AND (P_ID_SERVICE IS NULL OR ID_SERVICE = P_ID_SERVICE)
+      
+      --P_ID_BRANCH IS NULL-> CHECK EXISTS TAX VARIATION BY P_ID_BRANCH_GROUP
+      AND ( P_ID_BRANCH IS NOT NULL 
+            OR ( 
+                --P_ID_SERVICE IS NOT NULL -> CHECK EXISTS TAX VARIATION ID_SERVICE
+                (P_ID_SERVICE IS NULL OR tax_var.ID_SERVICE = P_ID_SERVICE)
+                AND
+                --P_ID_SERVICE IS NULL -> RETURN TRUE
+                (P_ID_SERVICE IS NOT NULL OR tax_var.ID_BRANCH_GROUP=P_ID_BRANCH_GROUP)
+               )
+          )    
+      --P_ID_BRANCH IS NOT NULL-> CHECK EXISTS TAX VARIATION BY P_ID_BRANCH_GROUP AND BY P_ID_BRANCH
+      AND ( P_ID_BRANCH IS NULL
+            OR (
+                tax_var.ID_BRANCH_GROUP=P_ID_BRANCH_GROUP 
+                AND
+                (tax_var.ID_BRANCH IS NULL OR APP1.ID_BRANCH=P_ID_BRANCH)
+               )
+          )
+      
+      --P_DT_END_TERM IS NULL-> CHECK EXISTS DT_END_TERM NULL VALUES
+      --                        CHECK EXISTS DT_START_TERM higher than P_DT_START_TERM
+      AND ( P_DT_END_TERM IS NOT NULL 
+            OR ( 
+                tax_var.DT_END_TERM IS NULL
+                OR tax_var.DT_START_TERM>=P_DT_START_TERM
+                OR P_DT_START_TERM BETWEEN tax_var.DT_START_TERM AND tax_var.DT_END_TERM
+               )
+          )
+      --P_DT_END_TERM IS NOT NULL-> CHECK P_DT_START_TERM IS BETWEEN ANY INTERVAL
+      --                            CHECK P_DT_END_TERM IS BETWEEN ANY INTERVAL
+      AND ( P_DT_END_TERM IS NULL
+            OR (
+                (P_DT_START_TERM BETWEEN tax_var.DT_START_TERM AND tax_var.DT_END_TERM
+                OR P_DT_END_TERM BETWEEN tax_var.DT_START_TERM AND tax_var.DT_END_TERM)
+               )
+          )
+      );
+
+END PR_VALIDATE_TAX_VARIATION;
